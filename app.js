@@ -1,6 +1,6 @@
 const clientId = "48eeca582e0f41d3b3071f318595bf83";
 
-const proxyBaseUrl = "https://d4bc-64-44-118-107.ngrok-free.app";
+const proxyBaseUrl = "https://f35a-64-44-118-107.ngrok-free.app";
 const redirectUri = "https://scott28.github.io/mini-spotify-player/";
 
 let spotifyPlayer = null;
