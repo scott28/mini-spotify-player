@@ -42,7 +42,8 @@ document.getElementById("login").onclick = async () => {
   const response = await fetch(`${proxyBaseUrl}/auth-url`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true"
     },
     body: JSON.stringify({
       redirectUri,
@@ -74,7 +75,8 @@ async function getAccessToken() {
   const response = await fetch(`${proxyBaseUrl}/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true"
     },
     body: JSON.stringify({
       code,
