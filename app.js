@@ -1,15 +1,9 @@
 const clientId = "48eeca582e0f41d3b3071f318595bf83";
 
-const redirectUri = "https://scott28.github.io/mini-spotify-player/";
 const proxyBaseUrl = "https://d4bc-64-44-118-107.ngrok-free.app";
+const redirectUri = "https://scott28.github.io/mini-spotify-player/";
 
-const scopes = [
-  "streaming",
-  "user-read-email",
-  "user-read-private",
-  "user-modify-playback-state",
-  "user-read-playback-state"
-];
+let spotifyPlayer = null;
 
 const statusEl = document.getElementById("status");
 
@@ -45,17 +39,25 @@ document.getElementById("login").onclick = async () => {
 
   const challenge = base64urlencode(await sha256(verifier));
 
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "code",
-    redirect_uri: redirectUri,
-    scope: scopes.join(" "),
-    code_challenge_method: "S256",
-    code_challenge: challenge
+  const response = await fetch(`${proxyBaseUrl}/auth-url`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      redirectUri,
+      codeChallenge: challenge
+    })
   });
 
-  window.location.href =
-    `${proxyBaseUrl}/spotify-auth/authorize?${params.toString()}`;
+  const data = await response.json();
+
+  if (!response.ok) {
+    log(JSON.stringify(data, null, 2));
+    return;
+  }
+
+  window.location.href = data.url;
 };
 
 async function getAccessToken() {
@@ -69,20 +71,16 @@ async function getAccessToken() {
 
   const verifier = localStorage.getItem("spotify_code_verifier");
 
-  const body = new URLSearchParams({
-    client_id: clientId,
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-    code_verifier: verifier
-  });
-
-  const response = await fetch(`${proxyBaseUrl}/spotify-auth/api/token`, {
+  const response = await fetch(`${proxyBaseUrl}/token`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
+      "Content-Type": "application/json"
     },
-    body
+    body: JSON.stringify({
+      code,
+      redirectUri,
+      codeVerifier: verifier
+    })
   });
 
   const data = await response.json();
@@ -108,49 +106,59 @@ document.getElementById("profile").onclick = async () => {
     return;
   }
 
-  const response = await fetch(`${proxyBaseUrl}/spotify-api/v1/me`, {
+  const response = await fetch(`${proxyBaseUrl}/me`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
   });
 
   const data = await response.json();
-
   log(JSON.stringify(data, null, 2));
+};
+
+document.getElementById("togglePlay").onclick = async () => {
+  if (!spotifyPlayer) {
+    log("Player not ready yet.");
+    return;
+  }
+
+  await spotifyPlayer.togglePlay();
+};
+
+document.getElementById("logout").onclick = () => {
+  localStorage.removeItem("spotify_access_token");
+  localStorage.removeItem("spotify_code_verifier");
+  log("Logged out.");
 };
 
 window.onSpotifyWebPlaybackSDKReady = async () => {
   const token = await getAccessToken();
 
   if (!token) {
-    log("Click Login with Spotify.");
+    log("Click Login.");
     return;
   }
 
-  const player = new Spotify.Player({
+  spotifyPlayer = new Spotify.Player({
     name: "Scott Mini Player",
     getOAuthToken: cb => cb(token),
     volume: 0.5
   });
 
-  player.addListener("ready", ({ device_id }) => {
+  spotifyPlayer.addListener("ready", ({ device_id }) => {
     log("Spotify player ready.");
     log("Device ID: " + device_id);
     log("Open Spotify and select 'Scott Mini Player' from devices.");
   });
 
-  player.addListener("not_ready", ({ device_id }) => {
+  spotifyPlayer.addListener("not_ready", ({ device_id }) => {
     log("Device went offline: " + device_id);
   });
 
-  player.addListener("initialization_error", ({ message }) => log(message));
-  player.addListener("authentication_error", ({ message }) => log(message));
-  player.addListener("account_error", ({ message }) => log(message));
-  player.addListener("playback_error", ({ message }) => log(message));
+  spotifyPlayer.addListener("initialization_error", ({ message }) => log(message));
+  spotifyPlayer.addListener("authentication_error", ({ message }) => log(message));
+  spotifyPlayer.addListener("account_error", ({ message }) => log(message));
+  spotifyPlayer.addListener("playback_error", ({ message }) => log(message));
 
-  document.getElementById("togglePlay").onclick = () => {
-    player.togglePlay();
-  };
-
-  await player.connect();
+  await spotifyPlayer.connect();
 };
