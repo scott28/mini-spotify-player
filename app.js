@@ -38,7 +38,7 @@ document.getElementById("login").onclick = async () => {
   localStorage.setItem("spotify_code_verifier", verifier);
 
   const challenge = base64urlencode(await sha256(verifier));
-
+/*
   const response = await fetch(`${proxyBaseUrl}/auth-url`, {
     method: "POST",
     headers: {
@@ -50,6 +50,10 @@ document.getElementById("login").onclick = async () => {
       codeChallenge: challenge
     })
   });
+*/
+const response = await fetch(
+  `${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`
+);  
 
   const data = await response.json();
 
