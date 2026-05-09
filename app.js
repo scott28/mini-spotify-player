@@ -52,8 +52,13 @@ document.getElementById("login").onclick = async () => {
   });
 */
 const response = await fetch(
-  `${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`
-);  
+  `${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`,
+  {
+    headers: {
+      "ngrok-skip-browser-warning": "true"
+    }
+  }
+); 
 
   const data = await response.json();
 
