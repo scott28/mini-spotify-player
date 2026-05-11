@@ -202,4 +202,10 @@ playPlaylistBtn.onclick = async () => {
 };
 
 const keyParam = new URLSearchParams(window.location.search).get("key");
-if (keyParam) document.getElementById("tokenKey").value = keyParam;
+const savedKey = localStorage.getItem("mini_spotify_last_username");
+if (keyParam) {
+  document.getElementById("tokenKey").value = keyParam;
+  localStorage.setItem("mini_spotify_last_username", keyParam);
+} else if (savedKey) {
+  document.getElementById("tokenKey").value = savedKey;
+}

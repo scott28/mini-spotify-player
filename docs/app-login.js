@@ -24,11 +24,23 @@ function base64urlencode(buffer) {
 }
 
 function generateTokenKey() {
-  return crypto.randomUUID();
+  const adjectives = [
+    "blue", "brave", "calm", "clever", "cosmic", "daring", "eager", "fancy",
+    "gentle", "happy", "jolly", "lucky", "mellow", "neon", "rapid", "sunny",
+  ];
+  const nouns = [
+    "panda", "otter", "falcon", "tiger", "koala", "whale", "badger", "sparrow",
+    "fox", "wolf", "lynx", "rabbit", "dolphin", "eagle", "heron", "yak",
+  ];
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const number = String(Math.floor(Math.random() * 100)).padStart(2, "0");
+  return `${adjective}-${noun}-${number}`;
 }
 
 function showPlayerLink(key) {
   const playerUrl = `/mini-spotify-player/player.html?key=${encodeURIComponent(key)}`;
+  localStorage.setItem("mini_spotify_last_username", key);
   nextLinkEl.style.display = "block";
   nextLinkEl.innerHTML = `<strong>Temporary Username:</strong> ${key}<br><a href="${playerUrl}">Open Player with this username</a>`;
 }
