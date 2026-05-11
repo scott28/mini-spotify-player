@@ -3,19 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <title>Spotify Player</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    nav { margin-bottom: 20px; }
+    nav a { margin-right: 12px; text-decoration: none; color: #0a66c2; }
+    nav a:hover { text-decoration: underline; }
+    .row { margin-bottom: 12px; }
+    ul { padding-left: 18px; }
+    li { margin: 6px 0; cursor: pointer; }
+    button { margin-right: 8px; padding: 6px 10px; }
+    pre { background: #f5f5f5; padding: 12px; white-space: pre-wrap; }
+  </style>
 </head>
 <body>
+  <nav>
+    <a href="/mini-spotify-player/login.html">Login / Save Token</a>
+    <a href="/mini-spotify-player/player.html">Player</a>
+  </nav>
+
   <h1>Spotify Player</h1>
-  <label>
-    Token Key:
-    <input id="tokenKey" placeholder="Paste key from login page" />
-  </label>
-  <button id="load">Load Token</button>
-  <button id="togglePlay">Play / Pause</button>
+  <div class="row">
+    <label>
+      Temporary Username:
+      <input id="tokenKey" placeholder="Paste key from login page" />
+    </label>
+    <button id="load">Load</button>
+  </div>
+
+  <div class="row">
+    <button id="loadPlaylists" disabled>Load Playlists</button>
+    <button id="playPlaylist" disabled>Play Selected Playlist</button>
+  </div>
+
+  <h3>Playlists</h3>
+  <ul id="playlists"></ul>
+
+  <h3>Tracks</h3>
+  <ul id="tracks"></ul>
 
   <pre id="status"></pre>
 
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <script type="module" src="./app-player.js"></script>
 </body>
 </html>

@@ -3,13 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <title>Mini Spotify Player</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    nav { margin-bottom: 20px; }
+    nav a { margin-right: 12px; text-decoration: none; color: #0a66c2; }
+    nav a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
+  <nav>
+    <a href="/mini-spotify-player/login.html">Login / Save Token</a>
+    <a href="/mini-spotify-player/player.html">Player</a>
+  </nav>
+
   <h1>Mini Spotify Player</h1>
-  <p>Choose a flow:</p>
-  <ul>
-    <li><a href="./login.html">1) Login + Save Token Key</a></li>
-    <li><a href="./player.html">2) Player (Load by Key)</a></li>
-  </ul>
+  <p>Use Login / Save Token first, then open Player with your temporary username.</p>
 </body>
 </html>
