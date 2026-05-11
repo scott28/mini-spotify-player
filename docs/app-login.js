@@ -1,17 +1,22 @@
 import { saveSpotifyToken } from "./firebase.js";
 
 const clientId = "48eeca582e0f41d3b3071f318595bf83";
-const proxyBaseUrl = "http://localhost:8090";
+const proxyBaseUrl = "https://f35a-64-44-118-107.ngrok-free.app";
 const redirectUri = `${window.location.origin}${window.location.pathname}`;
 
 const statusEl = document.getElementById("status");
 const nextLinkEl = document.getElementById("nextLink");
-function log(message) { statusEl.textContent += `${message}\n`; }
+function log(message) {
+  statusEl.textContent += `${message}\n`;
+}
 
 function generateRandomString(length) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   const values = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(values).map(x => chars[x % chars.length]).join("");
+  return Array.from(values)
+    .map((x) => chars[x % chars.length])
+    .join("");
 }
 
 async function sha256(plain) {
@@ -20,17 +25,48 @@ async function sha256(plain) {
 }
 
 function base64urlencode(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function generateTokenKey() {
   const adjectives = [
-    "blue", "brave", "calm", "clever", "cosmic", "daring", "eager", "fancy",
-    "gentle", "happy", "jolly", "lucky", "mellow", "neon", "rapid", "sunny",
+    "blue",
+    "brave",
+    "calm",
+    "clever",
+    "cosmic",
+    "daring",
+    "eager",
+    "fancy",
+    "gentle",
+    "happy",
+    "jolly",
+    "lucky",
+    "mellow",
+    "neon",
+    "rapid",
+    "sunny",
   ];
   const nouns = [
-    "panda", "otter", "falcon", "tiger", "koala", "whale", "badger", "sparrow",
-    "fox", "wolf", "lynx", "rabbit", "dolphin", "eagle", "heron", "yak",
+    "panda",
+    "otter",
+    "falcon",
+    "tiger",
+    "koala",
+    "whale",
+    "badger",
+    "sparrow",
+    "fox",
+    "wolf",
+    "lynx",
+    "rabbit",
+    "dolphin",
+    "eagle",
+    "heron",
+    "yak",
   ];
   const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const noun = nouns[Math.floor(Math.random() * nouns.length)];
@@ -50,7 +86,9 @@ document.getElementById("login").onclick = async () => {
   localStorage.setItem("spotify_code_verifier", verifier);
 
   const challenge = base64urlencode(await sha256(verifier));
-  const response = await fetch(`${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`);
+  const response = await fetch(
+    `${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`,
+  );
   const data = await response.json();
 
   if (!response.ok) {
@@ -81,7 +119,12 @@ async function autoExchangeIfCallback() {
   const response = await fetch(`${proxyBaseUrl}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, redirectUri, codeVerifier: verifier, clientId }),
+    body: JSON.stringify({
+      code,
+      redirectUri,
+      codeVerifier: verifier,
+      clientId,
+    }),
   });
 
   const data = await response.json();
