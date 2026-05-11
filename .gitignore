@@ -1,0 +1,22 @@
+# Node dependencies
+proxy/node_modules/
+
+# Environment variables
+proxy/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
