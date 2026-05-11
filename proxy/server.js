@@ -120,7 +120,16 @@ async function spotifyRequest(
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
+
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+  }
+
   return { status: response.status, data };
 }
 
