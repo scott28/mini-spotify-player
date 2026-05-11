@@ -5,6 +5,7 @@ const proxyBaseUrl = "http://localhost:8090";
 const redirectUri = `${window.location.origin}${window.location.pathname}`;
 
 const statusEl = document.getElementById("status");
+const nextLinkEl = document.getElementById("nextLink");
 function log(message) { statusEl.textContent += `${message}\n`; }
 
 function generateRandomString(length) {
@@ -26,6 +27,12 @@ function generateTokenKey() {
   return crypto.randomUUID();
 }
 
+function showPlayerLink(key) {
+  const playerUrl = `/mini-spotify-player/player.html?key=${encodeURIComponent(key)}`;
+  nextLinkEl.style.display = "block";
+  nextLinkEl.innerHTML = `<strong>Temporary Username:</strong> ${key}<br><a href="${playerUrl}">Open Player with this username</a>`;
+}
+
 document.getElementById("login").onclick = async () => {
   const verifier = generateRandomString(64);
   localStorage.setItem("spotify_code_verifier", verifier);
@@ -42,16 +49,23 @@ document.getElementById("login").onclick = async () => {
   window.location.href = data.url;
 };
 
-document.getElementById("exchange").onclick = async () => {
+async function autoExchangeIfCallback() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const verifier = localStorage.getItem("spotify_code_verifier");
 
-  if (!code || !verifier) {
-    log("Missing Spotify code or verifier. Click Login first.");
+  if (!code || !verifier) return;
+
+  // Guard to prevent duplicate auto-exchange on refresh/re-execution of callback URL.
+  const exchangeGuardKey = `spotify_exchange_done_${code}`;
+  if (sessionStorage.getItem(exchangeGuardKey)) {
+    window.history.replaceState({}, document.title, redirectUri);
+    log("Login already completed for this callback code.");
     return;
   }
+  sessionStorage.setItem(exchangeGuardKey, "1");
 
+  log("Completing Spotify login...");
   const response = await fetch(`${proxyBaseUrl}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -70,9 +84,13 @@ document.getElementById("exchange").onclick = async () => {
     refreshToken: data.refresh_token ?? null,
     expiresIn: data.expires_in,
     tokenType: data.token_type,
+    obtainedAt: Date.now(),
   });
 
-  log(`Saved token to Firestore.`);
-  log(`Share this key with Player page: ${key}`);
+  localStorage.removeItem("spotify_code_verifier");
   window.history.replaceState({}, document.title, redirectUri);
-};
+  log("Saved token to Firestore.");
+  showPlayerLink(key);
+}
+
+autoExchangeIfCallback();
