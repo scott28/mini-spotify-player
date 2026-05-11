@@ -1,6 +1,6 @@
 import { getSpotifyToken, updateSpotifyToken } from "./firebase.js";
 
-const proxyBaseUrl = "http://localhost:8090";
+const proxyBaseUrl = "https://f35a-64-44-118-107.ngrok-free.app";
 let tokenRecord = null;
 let selectedPlaylistId = null;
 let selectedPlaylistUri = null;
@@ -29,7 +29,9 @@ function isTokenExpired() {
 async function refreshTokenIfNeeded(force = false) {
   if (!tokenRecord?.refreshToken) return;
   if (!force && !isTokenExpired()) return;
-  const data = await proxyPost("/refresh", { refreshToken: tokenRecord.refreshToken });
+  const data = await proxyPost("/refresh", {
+    refreshToken: tokenRecord.refreshToken,
+  });
   if (!data.access_token) return;
   tokenRecord = {
     ...tokenRecord,
@@ -61,9 +63,15 @@ async function ensureBrowserPlayer() {
     });
     log("Playback transferred to browser player.");
   });
-  player.addListener("initialization_error", ({ message }) => log(`SDK init error: ${message}`));
-  player.addListener("authentication_error", ({ message }) => log(`SDK auth error: ${message}`));
-  player.addListener("account_error", ({ message }) => log(`SDK account error: ${message}`));
+  player.addListener("initialization_error", ({ message }) =>
+    log(`SDK init error: ${message}`),
+  );
+  player.addListener("authentication_error", ({ message }) =>
+    log(`SDK auth error: ${message}`),
+  );
+  player.addListener("account_error", ({ message }) =>
+    log(`SDK account error: ${message}`),
+  );
   await player.connect();
 }
 
@@ -113,7 +121,9 @@ function renderTracks(items, playlistId) {
           deviceId: playerDeviceId,
           offset: index,
         });
-        log(`Started playlist playback from track #${index + 1}: ${track.name}`);
+        log(
+          `Started playlist playback from track #${index + 1}: ${track.name}`,
+        );
       } catch (err) {
         log(`Start from track failed: ${err.error || JSON.stringify(err)}`);
       }
@@ -174,10 +184,13 @@ function renderPlaylists(playlists) {
       let offset = 0;
       let total = 1;
       while (offset < total) {
-        const tracks = await proxyPost(`/spotify/playlists/${playlist.id}/tracks`, {
-          accessToken: tokenRecord.accessToken,
-          offset,
-        });
+        const tracks = await proxyPost(
+          `/spotify/playlists/${playlist.id}/tracks`,
+          {
+            accessToken: tokenRecord.accessToken,
+            offset,
+          },
+        );
         allItems.push(...(tracks.items || []));
         total = tracks.total || allItems.length;
         offset += tracks.items?.length || 0;
@@ -204,10 +217,14 @@ document.getElementById("load").onclick = async () => {
     } catch (err) {
       const isRevoked = err?.error === "invalid_grant";
       if (isRevoked && !isTokenExpired()) {
-        log("Refresh token was revoked, but current access token is still valid.");
+        log(
+          "Refresh token was revoked, but current access token is still valid.",
+        );
       } else if (isRevoked) {
         tokenRecord = null;
-        return log("Refresh token was revoked and access token is expired. Please log in again.");
+        return log(
+          "Refresh token was revoked and access token is expired. Please log in again.",
+        );
       } else {
         throw err;
       }
@@ -215,7 +232,9 @@ document.getElementById("load").onclick = async () => {
 
     if (refreshIntervalId) clearInterval(refreshIntervalId);
     refreshIntervalId = setInterval(() => {
-      refreshTokenIfNeeded().catch((err) => log(`Background refresh failed: ${err.error || JSON.stringify(err)}`));
+      refreshTokenIfNeeded().catch((err) =>
+        log(`Background refresh failed: ${err.error || JSON.stringify(err)}`),
+      );
     }, 60_000);
     await ensureBrowserPlayer();
     loadPlaylistsBtn.disabled = false;
@@ -255,7 +274,9 @@ stopPlaybackBtn.onclick = async () => {
 setVolumeBtn.onclick = async () => {
   try {
     await refreshTokenIfNeeded();
-    const volumePercent = Number(document.getElementById("volumePercent").value || 0);
+    const volumePercent = Number(
+      document.getElementById("volumePercent").value || 0,
+    );
     await proxyPost("/spotify/volume", {
       accessToken: tokenRecord.accessToken,
       deviceId: playerDeviceId,

@@ -16,6 +16,7 @@ const allowedOrigins = [
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "https://scott28.github.io",
+  "https://player.curvele.cc",
 ];
 
 app.use(cors({ origin: allowedOrigins }));
@@ -165,7 +166,8 @@ async function getActiveDeviceId(accessToken) {
 
 app.post("/spotify/play", async (req, res) => {
   const { accessToken, contextUri, deviceId, offset } = req.body;
-  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  const targetDeviceId =
+    deviceId || (await getActiveDeviceId(accessToken)).deviceId;
   if (!targetDeviceId) {
     res.status(400).json({ error: "No active device found." });
     return;
@@ -177,7 +179,9 @@ app.post("/spotify/play", async (req, res) => {
     "PUT",
     {
       context_uri: contextUri,
-      ...(offset !== undefined ? { offset: { position: Number(offset) || 0 } } : {}),
+      ...(offset !== undefined
+        ? { offset: { position: Number(offset) || 0 } }
+        : {}),
     },
   );
   res.status(status).json(data);
@@ -196,7 +200,8 @@ app.post("/spotify/transfer-playback", async (req, res) => {
 
 app.post("/spotify/play-track", async (req, res) => {
   const { accessToken, playlistId, trackUri, trackIndex, deviceId } = req.body;
-  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  const targetDeviceId =
+    deviceId || (await getActiveDeviceId(accessToken)).deviceId;
   if (!targetDeviceId) {
     res.status(400).json({
       error:
@@ -221,7 +226,8 @@ app.post("/spotify/play-track", async (req, res) => {
 
 app.post("/spotify/pause", async (req, res) => {
   const { accessToken, deviceId } = req.body;
-  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  const targetDeviceId =
+    deviceId || (await getActiveDeviceId(accessToken)).deviceId;
   if (!targetDeviceId) {
     res.status(400).json({ error: "No active device found." });
     return;
@@ -237,7 +243,8 @@ app.post("/spotify/pause", async (req, res) => {
 
 app.post("/spotify/stop", async (req, res) => {
   const { accessToken, deviceId } = req.body;
-  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  const targetDeviceId =
+    deviceId || (await getActiveDeviceId(accessToken)).deviceId;
   if (!targetDeviceId) {
     res.status(400).json({ error: "No active device found." });
     return;
@@ -264,7 +271,8 @@ app.post("/spotify/stop", async (req, res) => {
 
 app.post("/spotify/volume", async (req, res) => {
   const { accessToken, deviceId, volumePercent } = req.body;
-  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  const targetDeviceId =
+    deviceId || (await getActiveDeviceId(accessToken)).deviceId;
   if (!targetDeviceId) {
     res.status(400).json({ error: "No active device found." });
     return;
@@ -280,5 +288,5 @@ app.post("/spotify/volume", async (req, res) => {
 });
 
 app.listen(8090, () => {
-  console.log("Spotify proxy running on http://localhost:8090");
+  console.log("running");
 });
