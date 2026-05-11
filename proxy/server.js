@@ -25,8 +25,10 @@ const scopes = [
   "streaming",
   "user-read-email",
   "user-read-private",
-  "user-modify-playback-state",
   "user-read-playback-state",
+  "user-modify-playback-state",
+  "playlist-read-private",
+  "playlist-read-collaborative",
 ];
 
 app.get("/", (req, res) => res.send("Spotify proxy running"));
@@ -68,7 +70,9 @@ app.post("/token", async (req, res) => {
     res.status(response.status).json(data);
   } catch (err) {
     console.error("Token exchange failed:", err);
-    res.status(500).json({ error: "token_exchange_failed", details: err.message });
+    res
+      .status(500)
+      .json({ error: "token_exchange_failed", details: err.message });
   }
 });
 
@@ -79,8 +83,13 @@ app.post("/refresh", async (req, res) => {
   }
 
   const { refreshToken } = req.body;
-  const body = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken });
-  const basicAuth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+  const basicAuth = Buffer.from(
+    `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`,
+  ).toString("base64");
 
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
@@ -95,7 +104,12 @@ app.post("/refresh", async (req, res) => {
   res.status(response.status).json(data);
 });
 
-async function spotifyRequest(path, accessToken, method = "GET", bodyObj = undefined) {
+async function spotifyRequest(
+  path,
+  accessToken,
+  method = "GET",
+  bodyObj = undefined,
+) {
   const response = await fetch(`${SPOTIFY_API_URL}${path}`, {
     method,
     headers: {
@@ -112,21 +126,31 @@ async function spotifyRequest(path, accessToken, method = "GET", bodyObj = undef
 
 app.post("/spotify/me/playlists", async (req, res) => {
   const { accessToken } = req.body;
-  const { status, data } = await spotifyRequest("/v1/me/playlists", accessToken);
+  const { status, data } = await spotifyRequest(
+    "/v1/me/playlists",
+    accessToken,
+  );
   res.status(status).json(data);
 });
 
 app.post("/spotify/playlists/:playlistId/tracks", async (req, res) => {
   const { accessToken } = req.body;
   const { playlistId } = req.params;
-  const { status, data } = await spotifyRequest(`/v1/playlists/${playlistId}/tracks`, accessToken);
+  const { status, data } = await spotifyRequest(
+    `/v1/playlists/${playlistId}/items`,
+    accessToken,
+  );
   res.status(status).json(data);
 });
 
 async function getActiveDeviceId(accessToken) {
-  const { status, data } = await spotifyRequest("/v1/me/player/devices", accessToken);
+  const { status, data } = await spotifyRequest(
+    "/v1/me/player/devices",
+    accessToken,
+  );
   if (status >= 400) return { error: data, status };
-  const active = (data.devices || []).find(d => d.is_active) || data.devices?.[0];
+  const active =
+    (data.devices || []).find((d) => d.is_active) || data.devices?.[0];
   return { deviceId: active?.id || null };
 }
 
@@ -134,7 +158,10 @@ app.post("/spotify/play", async (req, res) => {
   const { accessToken, contextUri } = req.body;
   const device = await getActiveDeviceId(accessToken);
   if (!device.deviceId) {
-    res.status(400).json({ error: "No active device found. Open Spotify on one of your devices first." });
+    res.status(400).json({
+      error:
+        "No active device found. Open Spotify on one of your devices first.",
+    });
     return;
   }
 
@@ -142,7 +169,7 @@ app.post("/spotify/play", async (req, res) => {
     `/v1/me/player/play?device_id=${encodeURIComponent(device.deviceId)}`,
     accessToken,
     "PUT",
-    { context_uri: contextUri }
+    { context_uri: contextUri },
   );
   res.status(status).json(data);
 });
@@ -151,7 +178,10 @@ app.post("/spotify/play-track", async (req, res) => {
   const { accessToken, playlistId, trackUri, trackIndex } = req.body;
   const device = await getActiveDeviceId(accessToken);
   if (!device.deviceId) {
-    res.status(400).json({ error: "No active device found. Open Spotify on one of your devices first." });
+    res.status(400).json({
+      error:
+        "No active device found. Open Spotify on one of your devices first.",
+    });
     return;
   }
 
@@ -161,8 +191,10 @@ app.post("/spotify/play-track", async (req, res) => {
     "PUT",
     {
       context_uri: `spotify:playlist:${playlistId}`,
-      offset: trackUri ? { uri: trackUri } : { position: Number(trackIndex) || 0 },
-    }
+      offset: trackUri
+        ? { uri: trackUri }
+        : { position: Number(trackIndex) || 0 },
+    },
   );
   res.status(status).json(data);
 });

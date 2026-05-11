@@ -12,7 +12,9 @@ const tracksEl = document.getElementById("tracks");
 const loadPlaylistsBtn = document.getElementById("loadPlaylists");
 const playPlaylistBtn = document.getElementById("playPlaylist");
 
-function log(message) { statusEl.textContent += `${message}\n`; }
+function log(message) {
+  statusEl.textContent += `${message}\n`;
+}
 
 async function proxyPost(path, body) {
   const response = await fetch(`${proxyBaseUrl}${path}`, {
@@ -36,7 +38,7 @@ function renderTracks(items, playlistId) {
     const track = item.track;
     if (!track) return;
     const li = document.createElement("li");
-    li.textContent = `${track.name} — ${(track.artists || []).map(a => a.name).join(", ")}`;
+    li.textContent = `${track.name} — ${(track.artists || []).map((a) => a.name).join(", ")}`;
     li.onclick = async () => {
       try {
         await proxyPost("/spotify/play-track", {
@@ -58,15 +60,18 @@ function renderPlaylists(playlists) {
   playlistsEl.innerHTML = "";
   playlists.forEach((playlist) => {
     const li = document.createElement("li");
-    li.textContent = `${playlist.name} (${playlist.tracks?.total ?? 0} tracks)`;
+    li.textContent = `${playlist.name} (${playlist.items?.total ?? 0} tracks)`;
     li.onclick = async () => {
       selectedPlaylistId = playlist.id;
       selectedPlaylistUri = playlist.uri;
       log(`Selected playlist: ${playlist.name}`);
       playPlaylistBtn.disabled = false;
-      const tracks = await proxyPost(`/spotify/playlists/${playlist.id}/tracks`, {
-        accessToken: tokenRecord.accessToken,
-      });
+      const tracks = await proxyPost(
+        `/spotify/playlists/${playlist.id}/tracks`,
+        {
+          accessToken: tokenRecord.accessToken,
+        },
+      );
       renderTracks(tracks.items || [], playlist.id);
     };
     playlistsEl.appendChild(li);
@@ -88,7 +93,9 @@ document.getElementById("load").onclick = async () => {
 loadPlaylistsBtn.onclick = async () => {
   if (!tokenRecord?.accessToken) return;
   try {
-    const data = await proxyPost("/spotify/me/playlists", { accessToken: tokenRecord.accessToken });
+    const data = await proxyPost("/spotify/me/playlists", {
+      accessToken: tokenRecord.accessToken,
+    });
     renderPlaylists(data.items || []);
     log("Playlists loaded.");
   } catch (err) {
