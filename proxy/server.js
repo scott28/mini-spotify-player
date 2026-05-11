@@ -155,29 +155,40 @@ async function getActiveDeviceId(accessToken) {
 }
 
 app.post("/spotify/play", async (req, res) => {
-  const { accessToken, contextUri } = req.body;
-  const device = await getActiveDeviceId(accessToken);
-  if (!device.deviceId) {
-    res.status(400).json({
-      error:
-        "No active device found. Open Spotify on one of your devices first.",
-    });
+  const { accessToken, contextUri, deviceId, offset } = req.body;
+  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  if (!targetDeviceId) {
+    res.status(400).json({ error: "No active device found." });
     return;
   }
 
   const { status, data } = await spotifyRequest(
-    `/v1/me/player/play?device_id=${encodeURIComponent(device.deviceId)}`,
+    `/v1/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`,
     accessToken,
     "PUT",
-    { context_uri: contextUri },
+    {
+      context_uri: contextUri,
+      ...(offset !== undefined ? { offset: { position: Number(offset) || 0 } } : {}),
+    },
+  );
+  res.status(status).json(data);
+});
+
+app.post("/spotify/transfer-playback", async (req, res) => {
+  const { accessToken, deviceId } = req.body;
+  const { status, data } = await spotifyRequest(
+    "/v1/me/player",
+    accessToken,
+    "PUT",
+    { device_ids: [deviceId], play: false },
   );
   res.status(status).json(data);
 });
 
 app.post("/spotify/play-track", async (req, res) => {
-  const { accessToken, playlistId, trackUri, trackIndex } = req.body;
-  const device = await getActiveDeviceId(accessToken);
-  if (!device.deviceId) {
+  const { accessToken, playlistId, trackUri, trackIndex, deviceId } = req.body;
+  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  if (!targetDeviceId) {
     res.status(400).json({
       error:
         "No active device found. Open Spotify on one of your devices first.",
@@ -186,7 +197,7 @@ app.post("/spotify/play-track", async (req, res) => {
   }
 
   const { status, data } = await spotifyRequest(
-    `/v1/me/player/play?device_id=${encodeURIComponent(device.deviceId)}`,
+    `/v1/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`,
     accessToken,
     "PUT",
     {

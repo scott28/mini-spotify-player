@@ -4,6 +4,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -28,4 +29,11 @@ export async function getSpotifyToken(key) {
   const snap = await getDoc(doc(db, "spotifyTokens", key));
   if (!snap.exists()) return null;
   return snap.data();
+}
+
+export async function updateSpotifyToken(key, tokenPayload) {
+  await updateDoc(doc(db, "spotifyTokens", key), {
+    ...tokenPayload,
+    updatedAt: serverTimestamp(),
+  });
 }

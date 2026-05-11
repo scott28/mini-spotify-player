@@ -1,16 +1,68 @@
-import { getSpotifyToken } from "./firebase.js";
+import { getSpotifyToken, updateSpotifyToken } from "./firebase.js";
 
 const proxyBaseUrl = "http://localhost:8090";
 let tokenRecord = null;
 let selectedPlaylistId = null;
 let selectedPlaylistUri = null;
 let currentTracks = [];
+let selectedPlaylistName = null;
+let playerDeviceId = null;
+let tokenKey = null;
+let refreshIntervalId = null;
 
 const statusEl = document.getElementById("status");
 const playlistsEl = document.getElementById("playlists");
 const tracksEl = document.getElementById("tracks");
 const loadPlaylistsBtn = document.getElementById("loadPlaylists");
 const playPlaylistBtn = document.getElementById("playPlaylist");
+const selectedPlaylistEl = document.getElementById("selectedPlaylist");
+
+function isTokenExpired() {
+  if (!tokenRecord?.obtainedAt || !tokenRecord?.expiresIn) return false;
+  const expiryMs = tokenRecord.obtainedAt + tokenRecord.expiresIn * 1000;
+  return Date.now() > expiryMs - 60_000;
+}
+
+async function refreshTokenIfNeeded(force = false) {
+  if (!tokenRecord?.refreshToken) return;
+  if (!force && !isTokenExpired()) return;
+  const data = await proxyPost("/refresh", { refreshToken: tokenRecord.refreshToken });
+  if (!data.access_token) return;
+  tokenRecord = {
+    ...tokenRecord,
+    accessToken: data.access_token,
+    expiresIn: data.expires_in || tokenRecord.expiresIn,
+    refreshToken: data.refresh_token || tokenRecord.refreshToken,
+    obtainedAt: Date.now(),
+  };
+  await updateSpotifyToken(tokenKey, tokenRecord);
+  log("Access token refreshed in background.");
+}
+
+async function ensureBrowserPlayer() {
+  if (playerDeviceId || !window.Spotify || !tokenRecord?.accessToken) return;
+  const player = new window.Spotify.Player({
+    name: "Mini Spotify Browser Player",
+    getOAuthToken: async (cb) => {
+      await refreshTokenIfNeeded();
+      cb(tokenRecord.accessToken);
+    },
+    volume: 0.8,
+  });
+  player.addListener("ready", async ({ device_id }) => {
+    playerDeviceId = device_id;
+    log("Browser player ready.");
+    await proxyPost("/spotify/transfer-playback", {
+      accessToken: tokenRecord.accessToken,
+      deviceId: playerDeviceId,
+    });
+    log("Playback transferred to browser player.");
+  });
+  player.addListener("initialization_error", ({ message }) => log(`SDK init error: ${message}`));
+  player.addListener("authentication_error", ({ message }) => log(`SDK auth error: ${message}`));
+  player.addListener("account_error", ({ message }) => log(`SDK account error: ${message}`));
+  await player.connect();
+}
 
 function log(message) {
   statusEl.textContent += `${message}\n`;
@@ -41,11 +93,13 @@ function renderTracks(items, playlistId) {
     li.textContent = `${track.name} — ${(track.artists || []).map((a) => a.name).join(", ")}`;
     li.onclick = async () => {
       try {
+        await refreshTokenIfNeeded();
         await proxyPost("/spotify/play-track", {
           accessToken: tokenRecord.accessToken,
           playlistId,
           trackUri: track.uri,
           trackIndex: index,
+          deviceId: playerDeviceId,
         });
         log(`Playing track: ${track.name}`);
       } catch (err) {
@@ -64,6 +118,8 @@ function renderPlaylists(playlists) {
     li.onclick = async () => {
       selectedPlaylistId = playlist.id;
       selectedPlaylistUri = playlist.uri;
+      selectedPlaylistName = playlist.name;
+      selectedPlaylistEl.textContent = `Selected: ${selectedPlaylistName}`;
       log(`Selected playlist: ${playlist.name}`);
       playPlaylistBtn.disabled = false;
       const tracks = await proxyPost(
@@ -79,13 +135,19 @@ function renderPlaylists(playlists) {
 }
 
 document.getElementById("load").onclick = async () => {
-  const key = getInputKey();
-  if (!key) return log("Enter a temporary username.");
+  tokenKey = getInputKey();
+  if (!tokenKey) return log("Enter a temporary username.");
 
-  const record = await getSpotifyToken(key);
+  const record = await getSpotifyToken(tokenKey);
   if (!record?.accessToken) return log("Temporary username not found.");
 
   tokenRecord = record;
+  await refreshTokenIfNeeded(true);
+  if (refreshIntervalId) clearInterval(refreshIntervalId);
+  refreshIntervalId = setInterval(() => {
+    refreshTokenIfNeeded().catch((err) => log(`Background refresh failed: ${err.error || JSON.stringify(err)}`));
+  }, 60_000);
+  await ensureBrowserPlayer();
   loadPlaylistsBtn.disabled = false;
   log("Token loaded. You can now load playlists.");
 };
@@ -93,6 +155,7 @@ document.getElementById("load").onclick = async () => {
 loadPlaylistsBtn.onclick = async () => {
   if (!tokenRecord?.accessToken) return;
   try {
+    await refreshTokenIfNeeded();
     const data = await proxyPost("/spotify/me/playlists", {
       accessToken: tokenRecord.accessToken,
     });
@@ -106,11 +169,16 @@ loadPlaylistsBtn.onclick = async () => {
 playPlaylistBtn.onclick = async () => {
   if (!selectedPlaylistUri) return log("Select a playlist first.");
   try {
+    await refreshTokenIfNeeded();
+    await ensureBrowserPlayer();
+    const startAt = Number(document.getElementById("startAt").value || 0);
     await proxyPost("/spotify/play", {
       accessToken: tokenRecord.accessToken,
       contextUri: selectedPlaylistUri,
+      deviceId: playerDeviceId,
+      offset: startAt,
     });
-    log("Started playlist playback.");
+    log(`Started playlist playback from track #${startAt + 1}.`);
   } catch (err) {
     log(`Play playlist failed: ${err.error || JSON.stringify(err)}`);
   }
