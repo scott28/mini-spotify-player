@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Spotify Player</title>
+</head>
+<body>
+  <h1>Spotify Player</h1>
+  <label>
+    Token Key:
+    <input id="tokenKey" placeholder="Paste key from login page" />
+  </label>
+  <button id="load">Load Token</button>
+  <button id="togglePlay">Play / Pause</button>
+
+  <pre id="status"></pre>
+
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script type="module" src="./app-player.js"></script>
+</body>
+</html>
