@@ -15,6 +15,10 @@ const playlistsEl = document.getElementById("playlists");
 const tracksEl = document.getElementById("tracks");
 const loadPlaylistsBtn = document.getElementById("loadPlaylists");
 const playPlaylistBtn = document.getElementById("playPlaylist");
+const pausePlaybackBtn = document.getElementById("pausePlayback");
+const stopPlaybackBtn = document.getElementById("stopPlayback");
+const setVolumeBtn = document.getElementById("setVolume");
+const jumpToTrackBtn = document.getElementById("jumpToTrack");
 const selectedPlaylistEl = document.getElementById("selectedPlaylist");
 
 function isTokenExpired() {
@@ -110,6 +114,13 @@ function renderTracks(items, playlistId) {
   });
 }
 
+function setPlaybackControlsEnabled(enabled) {
+  pausePlaybackBtn.disabled = !enabled;
+  stopPlaybackBtn.disabled = !enabled;
+  setVolumeBtn.disabled = !enabled;
+  jumpToTrackBtn.disabled = !enabled || !selectedPlaylistId || currentTracks.length === 0;
+}
+
 function renderPlaylists(playlists) {
   playlistsEl.innerHTML = "";
   playlists.forEach((playlist) => {
@@ -122,13 +133,21 @@ function renderPlaylists(playlists) {
       selectedPlaylistEl.textContent = `Selected: ${selectedPlaylistName}`;
       log(`Selected playlist: ${playlist.name}`);
       playPlaylistBtn.disabled = false;
-      const tracks = await proxyPost(
-        `/spotify/playlists/${playlist.id}/tracks`,
-        {
+      const allItems = [];
+      let offset = 0;
+      let total = 1;
+      while (offset < total) {
+        const tracks = await proxyPost(`/spotify/playlists/${playlist.id}/tracks`, {
           accessToken: tokenRecord.accessToken,
-        },
-      );
-      renderTracks(tracks.items || [], playlist.id);
+          offset,
+        });
+        allItems.push(...(tracks.items || []));
+        total = tracks.total || allItems.length;
+        offset += tracks.items?.length || 0;
+        if (!tracks.items?.length) break;
+      }
+      renderTracks(allItems, playlist.id);
+      setPlaybackControlsEnabled(true);
     };
     playlistsEl.appendChild(li);
   });
@@ -163,9 +182,74 @@ document.getElementById("load").onclick = async () => {
     }, 60_000);
     await ensureBrowserPlayer();
     loadPlaylistsBtn.disabled = false;
+    setPlaybackControlsEnabled(true);
     log("Token loaded. You can now load playlists.");
   } catch (err) {
     log(`Load token failed: ${err.error || JSON.stringify(err)}`);
+  }
+};
+
+pausePlaybackBtn.onclick = async () => {
+  try {
+    await refreshTokenIfNeeded();
+    await proxyPost("/spotify/pause", {
+      accessToken: tokenRecord.accessToken,
+      deviceId: playerDeviceId,
+    });
+    log("Playback paused.");
+  } catch (err) {
+    log(`Pause failed: ${err.error || JSON.stringify(err)}`);
+  }
+};
+
+stopPlaybackBtn.onclick = async () => {
+  try {
+    await refreshTokenIfNeeded();
+    await proxyPost("/spotify/stop", {
+      accessToken: tokenRecord.accessToken,
+      deviceId: playerDeviceId,
+    });
+    log("Playback stopped.");
+  } catch (err) {
+    log(`Stop failed: ${err.error || JSON.stringify(err)}`);
+  }
+};
+
+setVolumeBtn.onclick = async () => {
+  try {
+    await refreshTokenIfNeeded();
+    const volumePercent = Number(document.getElementById("volumePercent").value || 0);
+    await proxyPost("/spotify/volume", {
+      accessToken: tokenRecord.accessToken,
+      deviceId: playerDeviceId,
+      volumePercent,
+    });
+    log(`Volume set to ${Math.max(0, Math.min(100, volumePercent))}%.`);
+  } catch (err) {
+    log(`Set volume failed: ${err.error || JSON.stringify(err)}`);
+  }
+};
+
+jumpToTrackBtn.onclick = async () => {
+  if (!selectedPlaylistId || !currentTracks.length) return log("Load a playlist first.");
+  const jumpIndex = Number(document.getElementById("jumpTo").value || 1) - 1;
+  if (jumpIndex < 0 || jumpIndex >= currentTracks.length) {
+    return log(`Track # must be between 1 and ${currentTracks.length}.`);
+  }
+  const item = currentTracks[jumpIndex];
+  if (!item?.track?.uri) return log("Selected track is unavailable.");
+  try {
+    await refreshTokenIfNeeded();
+    await proxyPost("/spotify/play-track", {
+      accessToken: tokenRecord.accessToken,
+      playlistId: selectedPlaylistId,
+      trackUri: item.track.uri,
+      trackIndex: jumpIndex,
+      deviceId: playerDeviceId,
+    });
+    log(`Jumped to track #${jumpIndex + 1}: ${item.track.name}`);
+  } catch (err) {
+    log(`Jump failed: ${err.error || JSON.stringify(err)}`);
   }
 };
 

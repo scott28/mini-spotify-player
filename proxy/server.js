@@ -134,10 +134,10 @@ app.post("/spotify/me/playlists", async (req, res) => {
 });
 
 app.post("/spotify/playlists/:playlistId/tracks", async (req, res) => {
-  const { accessToken } = req.body;
+  const { accessToken, offset = 0 } = req.body;
   const { playlistId } = req.params;
   const { status, data } = await spotifyRequest(
-    `/v1/playlists/${playlistId}/items`,
+    `/v1/playlists/${playlistId}/items?limit=100&offset=${Number(offset) || 0}`,
     accessToken,
   );
   res.status(status).json(data);
@@ -206,6 +206,66 @@ app.post("/spotify/play-track", async (req, res) => {
         ? { uri: trackUri }
         : { position: Number(trackIndex) || 0 },
     },
+  );
+  res.status(status).json(data);
+});
+
+app.post("/spotify/pause", async (req, res) => {
+  const { accessToken, deviceId } = req.body;
+  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  if (!targetDeviceId) {
+    res.status(400).json({ error: "No active device found." });
+    return;
+  }
+
+  const { status, data } = await spotifyRequest(
+    `/v1/me/player/pause?device_id=${encodeURIComponent(targetDeviceId)}`,
+    accessToken,
+    "PUT",
+  );
+  res.status(status).json(data);
+});
+
+app.post("/spotify/stop", async (req, res) => {
+  const { accessToken, deviceId } = req.body;
+  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  if (!targetDeviceId) {
+    res.status(400).json({ error: "No active device found." });
+    return;
+  }
+
+  const { status, data } = await spotifyRequest(
+    `/v1/me/player/pause?device_id=${encodeURIComponent(targetDeviceId)}`,
+    accessToken,
+    "PUT",
+  );
+
+  if (status >= 400) {
+    res.status(status).json(data);
+    return;
+  }
+
+  const seek = await spotifyRequest(
+    `/v1/me/player/seek?position_ms=0&device_id=${encodeURIComponent(targetDeviceId)}`,
+    accessToken,
+    "PUT",
+  );
+  res.status(seek.status).json(seek.data);
+});
+
+app.post("/spotify/volume", async (req, res) => {
+  const { accessToken, deviceId, volumePercent } = req.body;
+  const targetDeviceId = deviceId || (await getActiveDeviceId(accessToken)).deviceId;
+  if (!targetDeviceId) {
+    res.status(400).json({ error: "No active device found." });
+    return;
+  }
+
+  const bounded = Math.max(0, Math.min(100, Number(volumePercent) || 0));
+  const { status, data } = await spotifyRequest(
+    `/v1/me/player/volume?volume_percent=${bounded}&device_id=${encodeURIComponent(targetDeviceId)}`,
+    accessToken,
+    "PUT",
   );
   res.status(status).json(data);
 });
