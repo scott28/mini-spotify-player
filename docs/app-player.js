@@ -18,7 +18,6 @@ const playPlaylistBtn = document.getElementById("playPlaylist");
 const pausePlaybackBtn = document.getElementById("pausePlayback");
 const stopPlaybackBtn = document.getElementById("stopPlayback");
 const setVolumeBtn = document.getElementById("setVolume");
-const jumpToTrackBtn = document.getElementById("jumpToTrack");
 const selectedPlaylistEl = document.getElementById("selectedPlaylist");
 
 function isTokenExpired() {
@@ -94,8 +93,38 @@ function renderTracks(items, playlistId) {
     const track = item.track;
     if (!track) return;
     const li = document.createElement("li");
-    li.textContent = `${track.name} — ${(track.artists || []).map((a) => a.name).join(", ")}`;
-    li.onclick = async () => {
+    li.className = "track-item";
+
+    const actionsEl = document.createElement("span");
+    actionsEl.className = "track-actions";
+
+    const startBtn = document.createElement("button");
+    startBtn.type = "button";
+    startBtn.className = "icon-btn";
+    startBtn.title = `Start playlist from #${index + 1}`;
+    startBtn.textContent = "▶️";
+    startBtn.onclick = async () => {
+      try {
+        await refreshTokenIfNeeded();
+        await ensureBrowserPlayer();
+        await proxyPost("/spotify/play", {
+          accessToken: tokenRecord.accessToken,
+          contextUri: selectedPlaylistUri,
+          deviceId: playerDeviceId,
+          offset: index,
+        });
+        log(`Started playlist playback from track #${index + 1}: ${track.name}`);
+      } catch (err) {
+        log(`Start from track failed: ${err.error || JSON.stringify(err)}`);
+      }
+    };
+
+    const jumpBtn = document.createElement("button");
+    jumpBtn.type = "button";
+    jumpBtn.className = "icon-btn";
+    jumpBtn.title = `Jump directly to #${index + 1}`;
+    jumpBtn.textContent = "⤴️";
+    jumpBtn.onclick = async () => {
       try {
         await refreshTokenIfNeeded();
         await proxyPost("/spotify/play-track", {
@@ -105,11 +134,20 @@ function renderTracks(items, playlistId) {
           trackIndex: index,
           deviceId: playerDeviceId,
         });
-        log(`Playing track: ${track.name}`);
+        log(`Jumped to track #${index + 1}: ${track.name}`);
       } catch (err) {
-        log(`Play track failed: ${err.error || JSON.stringify(err)}`);
+        log(`Jump failed: ${err.error || JSON.stringify(err)}`);
       }
     };
+
+    const trackNameEl = document.createElement("span");
+    trackNameEl.className = "track-name";
+    trackNameEl.textContent = `${index + 1}. ${track.name} — ${(track.artists || []).map((a) => a.name).join(", ")}`;
+
+    actionsEl.appendChild(startBtn);
+    actionsEl.appendChild(jumpBtn);
+    li.appendChild(actionsEl);
+    li.appendChild(trackNameEl);
     tracksEl.appendChild(li);
   });
 }
@@ -118,7 +156,6 @@ function setPlaybackControlsEnabled(enabled) {
   pausePlaybackBtn.disabled = !enabled;
   stopPlaybackBtn.disabled = !enabled;
   setVolumeBtn.disabled = !enabled;
-  jumpToTrackBtn.disabled = !enabled || !selectedPlaylistId || currentTracks.length === 0;
 }
 
 function renderPlaylists(playlists) {
@@ -230,29 +267,6 @@ setVolumeBtn.onclick = async () => {
   }
 };
 
-jumpToTrackBtn.onclick = async () => {
-  if (!selectedPlaylistId || !currentTracks.length) return log("Load a playlist first.");
-  const jumpIndex = Number(document.getElementById("jumpTo").value || 1) - 1;
-  if (jumpIndex < 0 || jumpIndex >= currentTracks.length) {
-    return log(`Track # must be between 1 and ${currentTracks.length}.`);
-  }
-  const item = currentTracks[jumpIndex];
-  if (!item?.track?.uri) return log("Selected track is unavailable.");
-  try {
-    await refreshTokenIfNeeded();
-    await proxyPost("/spotify/play-track", {
-      accessToken: tokenRecord.accessToken,
-      playlistId: selectedPlaylistId,
-      trackUri: item.track.uri,
-      trackIndex: jumpIndex,
-      deviceId: playerDeviceId,
-    });
-    log(`Jumped to track #${jumpIndex + 1}: ${item.track.name}`);
-  } catch (err) {
-    log(`Jump failed: ${err.error || JSON.stringify(err)}`);
-  }
-};
-
 loadPlaylistsBtn.onclick = async () => {
   if (!tokenRecord?.accessToken) return;
   try {
@@ -272,14 +286,13 @@ playPlaylistBtn.onclick = async () => {
   try {
     await refreshTokenIfNeeded();
     await ensureBrowserPlayer();
-    const startAt = Number(document.getElementById("startAt").value || 0);
     await proxyPost("/spotify/play", {
       accessToken: tokenRecord.accessToken,
       contextUri: selectedPlaylistUri,
       deviceId: playerDeviceId,
-      offset: startAt,
+      offset: 0,
     });
-    log(`Started playlist playback from track #${startAt + 1}.`);
+    log("Started playlist playback from track #1.");
   } catch (err) {
     log(`Play playlist failed: ${err.error || JSON.stringify(err)}`);
   }
