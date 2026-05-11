@@ -138,18 +138,35 @@ document.getElementById("load").onclick = async () => {
   tokenKey = getInputKey();
   if (!tokenKey) return log("Enter a temporary username.");
 
-  const record = await getSpotifyToken(tokenKey);
-  if (!record?.accessToken) return log("Temporary username not found.");
+  try {
+    const record = await getSpotifyToken(tokenKey);
+    if (!record?.accessToken) return log("Temporary username not found.");
 
-  tokenRecord = record;
-  await refreshTokenIfNeeded(true);
-  if (refreshIntervalId) clearInterval(refreshIntervalId);
-  refreshIntervalId = setInterval(() => {
-    refreshTokenIfNeeded().catch((err) => log(`Background refresh failed: ${err.error || JSON.stringify(err)}`));
-  }, 60_000);
-  await ensureBrowserPlayer();
-  loadPlaylistsBtn.disabled = false;
-  log("Token loaded. You can now load playlists.");
+    tokenRecord = record;
+    try {
+      await refreshTokenIfNeeded(true);
+    } catch (err) {
+      const isRevoked = err?.error === "invalid_grant";
+      if (isRevoked && !isTokenExpired()) {
+        log("Refresh token was revoked, but current access token is still valid.");
+      } else if (isRevoked) {
+        tokenRecord = null;
+        return log("Refresh token was revoked and access token is expired. Please log in again.");
+      } else {
+        throw err;
+      }
+    }
+
+    if (refreshIntervalId) clearInterval(refreshIntervalId);
+    refreshIntervalId = setInterval(() => {
+      refreshTokenIfNeeded().catch((err) => log(`Background refresh failed: ${err.error || JSON.stringify(err)}`));
+    }, 60_000);
+    await ensureBrowserPlayer();
+    loadPlaylistsBtn.disabled = false;
+    log("Token loaded. You can now load playlists.");
+  } catch (err) {
+    log(`Load token failed: ${err.error || JSON.stringify(err)}`);
+  }
 };
 
 loadPlaylistsBtn.onclick = async () => {
@@ -185,4 +202,10 @@ playPlaylistBtn.onclick = async () => {
 };
 
 const keyParam = new URLSearchParams(window.location.search).get("key");
-if (keyParam) document.getElementById("tokenKey").value = keyParam;
+const savedKey = localStorage.getItem("mini_spotify_last_username");
+if (keyParam) {
+  document.getElementById("tokenKey").value = keyParam;
+  localStorage.setItem("mini_spotify_last_username", keyParam);
+} else if (savedKey) {
+  document.getElementById("tokenKey").value = savedKey;
+}
