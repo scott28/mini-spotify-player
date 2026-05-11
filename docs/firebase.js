@@ -7,10 +7,11 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME",
-  projectId: "REPLACE_ME",
+  apiKey: "AIzaSyBElz8mNRr6DZijhg7FKe20pE4SoNJRvE4",
+  authDomain: "mini-spotify-player-86d3c.firebaseapp.com",
+  projectId: "mini-spotify-player-86d3c",
 };
 
 const app = initializeApp(firebaseConfig);

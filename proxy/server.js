@@ -1,9 +1,11 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
 
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || "48eeca582e0f41d3b3071f318595bf83";
+const SPOTIFY_CLIENT_ID =
+  process.env.SPOTIFY_CLIENT_ID || "48eeca582e0f41d3b3071f318595bf83";
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || "";
 
 const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize";
@@ -45,25 +47,37 @@ app.get("/auth-url", (req, res) => {
 });
 
 app.post("/token", async (req, res) => {
-  const { code, redirectUri, codeVerifier } = req.body;
-  const body = new URLSearchParams({
-    client_id: SPOTIFY_CLIENT_ID,
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-    code_verifier: codeVerifier,
-  });
+  try {
+    const { code, redirectUri, codeVerifier, clientId } = req.body;
 
-  const response = await fetch(SPOTIFY_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+    const body = new URLSearchParams({
+      client_id: clientId,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    });
 
-  const data = await response.json();
-  res.status(response.status).json(data);
+    const response = await fetch(SPOTIFY_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+    });
+
+    const data = await response.json();
+
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.error("Token exchange failed:", err);
+
+    res.status(500).json({
+      error: "token_exchange_failed",
+      details: err.message,
+    });
+  }
 });
-
 app.post("/refresh", async (req, res) => {
   if (!SPOTIFY_CLIENT_SECRET) {
     res.status(500).json({ error: "SPOTIFY_CLIENT_SECRET is not configured." });
@@ -76,7 +90,9 @@ app.post("/refresh", async (req, res) => {
     refresh_token: refreshToken,
   });
 
-  const basicAuth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64");
+  const basicAuth = Buffer.from(
+    `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`,
+  ).toString("base64");
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
     headers: {
