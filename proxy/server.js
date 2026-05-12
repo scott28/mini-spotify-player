@@ -288,6 +288,15 @@ app.post("/spotify/volume", async (req, res) => {
   res.status(status).json(data);
 });
 
+app._router.stack.forEach((layer) => {
+  if (layer.route) {
+    console.log(
+      Object.keys(layer.route.methods).join(",").toUpperCase(),
+      layer.route.path,
+    );
+  }
+});
+
 app.listen(8090, () => {
   console.log("running");
 });
