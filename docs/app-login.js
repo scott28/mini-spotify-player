@@ -88,6 +88,11 @@ document.getElementById("login").onclick = async () => {
   const challenge = base64urlencode(await sha256(verifier));
   const response = await fetch(
     `${proxyBaseUrl}/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&codeChallenge=${encodeURIComponent(challenge)}`,
+    {
+      headers: new Headers({
+        "ngrok-skip-browser-warning": "true",
+      }),
+    },
   );
   const data = await response.json();
 
@@ -118,7 +123,10 @@ async function autoExchangeIfCallback() {
   log("Completing Spotify login...");
   const response = await fetch(`${proxyBaseUrl}/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true", // This bypasses the interstitial page
+    },
     body: JSON.stringify({
       code,
       redirectUri,

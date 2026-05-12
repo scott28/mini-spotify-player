@@ -82,7 +82,10 @@ function log(message) {
 async function proxyPost(path, body) {
   const response = await fetch(`${proxyBaseUrl}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true", // This bypasses the interstitial page
+    },
     body: JSON.stringify(body),
   });
   const data = await response.json();
