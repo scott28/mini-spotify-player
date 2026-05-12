@@ -20,6 +20,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({ origin: allowedOrigins }));
+app.options("*", cors());
 app.use(express.json());
 
 const scopes = [

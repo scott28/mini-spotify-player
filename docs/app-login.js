@@ -1,7 +1,7 @@
 import { saveSpotifyToken } from "./firebase.js";
 
 const clientId = "48eeca582e0f41d3b3071f318595bf83";
-const proxyBaseUrl = "https://f35a-64-44-118-107.ngrok-free.app";
+const proxyBaseUrl = "https://c4ea-107-10-242-5.ngrok-free.app";
 const redirectUri = `${window.location.origin}${window.location.pathname}`;
 
 const statusEl = document.getElementById("status");

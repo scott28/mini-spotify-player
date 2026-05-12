@@ -1,6 +1,6 @@
 import { getSpotifyToken, updateSpotifyToken } from "./firebase.js";
 
-const proxyBaseUrl = "https://f35a-64-44-118-107.ngrok-free.app";
+const proxyBaseUrl = "https://c4ea-107-10-242-5.ngrok-free.app";
 let tokenRecord = null;
 let selectedPlaylistId = null;
 let selectedPlaylistUri = null;
