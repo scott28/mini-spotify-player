@@ -7,13 +7,18 @@ let selectedPlaylistUri = null;
 let currentTracks = [];
 let selectedPlaylistName = null;
 let playerDeviceId = null;
+let selectedDeviceId = null;
 let tokenKey = null;
 let refreshIntervalId = null;
 
 const statusEl = document.getElementById("status");
 const playlistsEl = document.getElementById("playlists");
 const tracksEl = document.getElementById("tracks");
+const devicesEl = document.getElementById("devices");
+const selectedDeviceEl = document.getElementById("selectedDevice");
 const loadPlaylistsBtn = document.getElementById("loadPlaylists");
+const refreshDevicesBtn = document.getElementById("refreshDevices");
+const useBrowserDeviceBtn = document.getElementById("useBrowserDevice");
 const playPlaylistBtn = document.getElementById("playPlaylist");
 const pausePlaybackBtn = document.getElementById("pausePlayback");
 const stopPlaybackBtn = document.getElementById("stopPlayback");
@@ -56,12 +61,11 @@ async function ensureBrowserPlayer() {
   });
   player.addListener("ready", async ({ device_id }) => {
     playerDeviceId = device_id;
+    if (!selectedDeviceId) {
+      selectedDeviceId = device_id;
+      renderSelectedDeviceLabel();
+    }
     log("Browser player ready.");
-    await proxyPost("/spotify/transfer-playback", {
-      accessToken: tokenRecord.accessToken,
-      deviceId: playerDeviceId,
-    });
-    log("Playback transferred to browser player.");
   });
   player.addListener("initialization_error", ({ message }) =>
     log(`SDK init error: ${message}`),
@@ -84,7 +88,7 @@ async function proxyPost(path, body) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true", // This bypasses the interstitial page
+      "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify(body),
   });
@@ -97,7 +101,64 @@ function getInputKey() {
   return document.getElementById("tokenKey").value.trim();
 }
 
-function renderTracks(items, playlistId) {
+function getPlaybackDeviceId() {
+  return selectedDeviceId || playerDeviceId || null;
+}
+
+function renderSelectedDeviceLabel() {
+  if (!selectedDeviceId) {
+    selectedDeviceEl.textContent = "Selected device: Auto (Spotify active device)";
+    return;
+  }
+  selectedDeviceEl.textContent = `Selected device: ${selectedDeviceId}`;
+}
+
+function renderDevices(devices) {
+  devicesEl.innerHTML = "";
+  if (!devices.length) {
+    const li = document.createElement("li");
+    li.textContent = "No Spotify devices found. Open Spotify on your target device first.";
+    devicesEl.appendChild(li);
+    return;
+  }
+
+  devices.forEach((device) => {
+    const li = document.createElement("li");
+    const isSelected = selectedDeviceId === device.id;
+    const flags = [device.is_active ? "active" : null, device.is_restricted ? "restricted" : null]
+      .filter(Boolean)
+      .join(", ");
+    li.textContent = `${device.name} (${device.type})${flags ? ` - ${flags}` : ""}`;
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.textContent = isSelected ? "Selected" : "Use this device";
+    useBtn.disabled = isSelected;
+    useBtn.onclick = async () => {
+      selectedDeviceId = device.id;
+      renderSelectedDeviceLabel();
+      await proxyPost("/spotify/transfer-playback", {
+        accessToken: tokenRecord.accessToken,
+        deviceId: selectedDeviceId,
+      });
+      log(`Transferred playback to ${device.name}.`);
+      await loadDevices();
+    };
+
+    li.appendChild(useBtn);
+    devicesEl.appendChild(li);
+  });
+}
+
+async function loadDevices() {
+  await refreshTokenIfNeeded();
+  const data = await proxyPost("/spotify/devices", {
+    accessToken: tokenRecord.accessToken,
+  });
+  renderDevices(data.devices || []);
+}
+
+function renderTracks(items, playlistId) { /* unchanged below */
   tracksEl.innerHTML = "";
   currentTracks = items;
   items.forEach((item, index) => {
@@ -121,12 +182,10 @@ function renderTracks(items, playlistId) {
         await proxyPost("/spotify/play", {
           accessToken: tokenRecord.accessToken,
           contextUri: selectedPlaylistUri,
-          deviceId: playerDeviceId,
+          deviceId: getPlaybackDeviceId(),
           offset: index,
         });
-        log(
-          `Started playlist playback from track #${index + 1}: ${track.name}`,
-        );
+        log(`Started playlist playback from track #${index + 1}: ${track.name}`);
       } catch (err) {
         log(`Start from track failed: ${err.error || JSON.stringify(err)}`);
       }
@@ -145,7 +204,7 @@ function renderTracks(items, playlistId) {
           playlistId,
           trackUri: track.uri,
           trackIndex: index,
-          deviceId: playerDeviceId,
+          deviceId: getPlaybackDeviceId(),
         });
         log(`Jumped to track #${index + 1}: ${track.name}`);
       } catch (err) {
@@ -164,14 +223,8 @@ function renderTracks(items, playlistId) {
     tracksEl.appendChild(li);
   });
 }
-
-function setPlaybackControlsEnabled(enabled) {
-  pausePlaybackBtn.disabled = !enabled;
-  stopPlaybackBtn.disabled = !enabled;
-  setVolumeBtn.disabled = !enabled;
-}
-
-function renderPlaylists(playlists) {
+function setPlaybackControlsEnabled(enabled) { pausePlaybackBtn.disabled=!enabled; stopPlaybackBtn.disabled=!enabled; setVolumeBtn.disabled=!enabled; }
+function renderPlaylists(playlists) { /* keep */
   playlistsEl.innerHTML = "";
   playlists.forEach((playlist) => {
     const li = document.createElement("li");
@@ -187,13 +240,7 @@ function renderPlaylists(playlists) {
       let offset = 0;
       let total = 1;
       while (offset < total) {
-        const tracks = await proxyPost(
-          `/spotify/playlists/${playlist.id}/tracks`,
-          {
-            accessToken: tokenRecord.accessToken,
-            offset,
-          },
-        );
+        const tracks = await proxyPost(`/spotify/playlists/${playlist.id}/tracks`, { accessToken: tokenRecord.accessToken, offset });
         allItems.push(...(tracks.items || []));
         total = tracks.total || allItems.length;
         offset += tracks.items?.length || 0;
@@ -209,124 +256,57 @@ function renderPlaylists(playlists) {
 document.getElementById("load").onclick = async () => {
   tokenKey = getInputKey();
   if (!tokenKey) return log("Enter a temporary username.");
-
   try {
     const record = await getSpotifyToken(tokenKey);
     if (!record?.accessToken) return log("Temporary username not found.");
-
     tokenRecord = record;
-    try {
-      await refreshTokenIfNeeded(true);
-    } catch (err) {
+    try { await refreshTokenIfNeeded(true); } catch (err) {
       const isRevoked = err?.error === "invalid_grant";
       if (isRevoked && !isTokenExpired()) {
-        log(
-          "Refresh token was revoked, but current access token is still valid.",
-        );
-      } else if (isRevoked) {
-        tokenRecord = null;
-        return log(
-          "Refresh token was revoked and access token is expired. Please log in again.",
-        );
-      } else {
-        throw err;
-      }
+        log("Refresh token was revoked, but current access token is still valid.");
+      } else if (isRevoked) { tokenRecord = null; return log("Refresh token was revoked and access token is expired. Please log in again."); }
+      else { throw err; }
     }
-
     if (refreshIntervalId) clearInterval(refreshIntervalId);
     refreshIntervalId = setInterval(() => {
-      refreshTokenIfNeeded().catch((err) =>
-        log(`Background refresh failed: ${err.error || JSON.stringify(err)}`),
-      );
+      refreshTokenIfNeeded().catch((err) => log(`Background refresh failed: ${err.error || JSON.stringify(err)}`));
     }, 60_000);
     await ensureBrowserPlayer();
+    await loadDevices();
+    refreshDevicesBtn.disabled = false;
+    useBrowserDeviceBtn.disabled = false;
     loadPlaylistsBtn.disabled = false;
     setPlaybackControlsEnabled(true);
-    log("Token loaded. You can now load playlists.");
+    renderSelectedDeviceLabel();
+    log("Token loaded. You can now load devices and playlists.");
   } catch (err) {
     log(`Load token failed: ${err.error || JSON.stringify(err)}`);
   }
 };
 
-pausePlaybackBtn.onclick = async () => {
-  try {
-    await refreshTokenIfNeeded();
-    await proxyPost("/spotify/pause", {
-      accessToken: tokenRecord.accessToken,
-      deviceId: playerDeviceId,
-    });
-    log("Playback paused.");
-  } catch (err) {
-    log(`Pause failed: ${err.error || JSON.stringify(err)}`);
-  }
+refreshDevicesBtn.onclick = async () => {
+  try { await loadDevices(); log("Devices refreshed."); } catch (err) { log(`Refresh devices failed: ${err.error || JSON.stringify(err)}`); }
 };
 
-stopPlaybackBtn.onclick = async () => {
+useBrowserDeviceBtn.onclick = async () => {
   try {
-    await refreshTokenIfNeeded();
-    await proxyPost("/spotify/stop", {
-      accessToken: tokenRecord.accessToken,
-      deviceId: playerDeviceId,
-    });
-    log("Playback stopped.");
-  } catch (err) {
-    log(`Stop failed: ${err.error || JSON.stringify(err)}`);
-  }
-};
-
-setVolumeBtn.onclick = async () => {
-  try {
-    await refreshTokenIfNeeded();
-    const volumePercent = Number(
-      document.getElementById("volumePercent").value || 0,
-    );
-    await proxyPost("/spotify/volume", {
-      accessToken: tokenRecord.accessToken,
-      deviceId: playerDeviceId,
-      volumePercent,
-    });
-    log(`Volume set to ${Math.max(0, Math.min(100, volumePercent))}%.`);
-  } catch (err) {
-    log(`Set volume failed: ${err.error || JSON.stringify(err)}`);
-  }
-};
-
-loadPlaylistsBtn.onclick = async () => {
-  if (!tokenRecord?.accessToken) return;
-  try {
-    await refreshTokenIfNeeded();
-    const data = await proxyPost("/spotify/me/playlists", {
-      accessToken: tokenRecord.accessToken,
-    });
-    renderPlaylists(data.items || []);
-    log("Playlists loaded.");
-  } catch (err) {
-    log(`Load playlists failed: ${err.error || JSON.stringify(err)}`);
-  }
-};
-
-playPlaylistBtn.onclick = async () => {
-  if (!selectedPlaylistUri) return log("Select a playlist first.");
-  try {
-    await refreshTokenIfNeeded();
     await ensureBrowserPlayer();
-    await proxyPost("/spotify/play", {
-      accessToken: tokenRecord.accessToken,
-      contextUri: selectedPlaylistUri,
-      deviceId: playerDeviceId,
-      offset: 0,
-    });
-    log("Started playlist playback from track #1.");
-  } catch (err) {
-    log(`Play playlist failed: ${err.error || JSON.stringify(err)}`);
-  }
+    if (!playerDeviceId) return log("Browser device is not ready yet. Try again in a moment.");
+    selectedDeviceId = playerDeviceId;
+    await proxyPost("/spotify/transfer-playback", { accessToken: tokenRecord.accessToken, deviceId: selectedDeviceId });
+    renderSelectedDeviceLabel();
+    log("Transferred playback to this laptop/browser device.");
+    await loadDevices();
+  } catch (err) { log(`Use browser device failed: ${err.error || JSON.stringify(err)}`); }
 };
+
+pausePlaybackBtn.onclick = async () => { try { await refreshTokenIfNeeded(); await proxyPost("/spotify/pause", { accessToken: tokenRecord.accessToken, deviceId: getPlaybackDeviceId() }); log("Playback paused."); } catch (err) { log(`Pause failed: ${err.error || JSON.stringify(err)}`); } };
+stopPlaybackBtn.onclick = async () => { try { await refreshTokenIfNeeded(); await proxyPost("/spotify/stop", { accessToken: tokenRecord.accessToken, deviceId: getPlaybackDeviceId() }); log("Playback stopped."); } catch (err) { log(`Stop failed: ${err.error || JSON.stringify(err)}`); } };
+setVolumeBtn.onclick = async () => { try { await refreshTokenIfNeeded(); const volumePercent = Number(document.getElementById("volumePercent").value || 0); await proxyPost("/spotify/volume", { accessToken: tokenRecord.accessToken, deviceId: getPlaybackDeviceId(), volumePercent }); log(`Volume set to ${Math.max(0, Math.min(100, volumePercent))}%.`); } catch (err) { log(`Set volume failed: ${err.error || JSON.stringify(err)}`); } };
+loadPlaylistsBtn.onclick = async () => { if (!tokenRecord?.accessToken) return; try { await refreshTokenIfNeeded(); const data = await proxyPost("/spotify/me/playlists", { accessToken: tokenRecord.accessToken }); renderPlaylists(data.items || []); log("Playlists loaded."); } catch (err) { log(`Load playlists failed: ${err.error || JSON.stringify(err)}`); } };
+playPlaylistBtn.onclick = async () => { if (!selectedPlaylistUri) return log("Select a playlist first."); try { await refreshTokenIfNeeded(); await ensureBrowserPlayer(); await proxyPost("/spotify/play", { accessToken: tokenRecord.accessToken, contextUri: selectedPlaylistUri, deviceId: getPlaybackDeviceId(), offset: 0 }); log("Started playlist playback from track #1."); } catch (err) { log(`Play playlist failed: ${err.error || JSON.stringify(err)}`); } };
 
 const keyParam = new URLSearchParams(window.location.search).get("key");
 const savedKey = localStorage.getItem("mini_spotify_last_username");
-if (keyParam) {
-  document.getElementById("tokenKey").value = keyParam;
-  localStorage.setItem("mini_spotify_last_username", keyParam);
-} else if (savedKey) {
-  document.getElementById("tokenKey").value = savedKey;
-}
+if (keyParam) { document.getElementById("tokenKey").value = keyParam; localStorage.setItem("mini_spotify_last_username", keyParam); }
+else if (savedKey) { document.getElementById("tokenKey").value = savedKey; }

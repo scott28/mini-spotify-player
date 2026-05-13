@@ -135,6 +135,15 @@ async function spotifyRequest(
   return { status: response.status, data };
 }
 
+app.post("/spotify/devices", async (req, res) => {
+  const { accessToken } = req.body;
+  const { status, data } = await spotifyRequest(
+    "/v1/me/player/devices",
+    accessToken,
+  );
+  res.status(status).json(data);
+});
+
 app.post("/spotify/me/playlists", async (req, res) => {
   const { accessToken } = req.body;
   const { status, data } = await spotifyRequest(
