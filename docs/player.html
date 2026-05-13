@@ -35,6 +35,8 @@
   </div>
 
   <div class="row">
+    <button id="refreshDevices" disabled>Refresh Devices</button>
+    <button id="useBrowserDevice" disabled>Use This Laptop Browser</button>
     <button id="loadPlaylists" disabled>Load Playlists</button>
     <button id="playPlaylist" disabled>Play Selected Playlist</button>
     <button id="pausePlayback" disabled>Pause</button>
@@ -45,6 +47,10 @@
     </label>
     <button id="setVolume" disabled>Set Volume</button>
   </div>
+
+  <div class="row" id="selectedDevice">Selected device: Auto (Spotify active device)</div>
+  <h3>Devices</h3>
+  <ul id="devices"></ul>
 
   <div class="row" id="selectedPlaylist">Selected: none</div>
 
